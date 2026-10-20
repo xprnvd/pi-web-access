@@ -56,26 +56,29 @@ jobs:
       - name: Merge the upstream release
         if: steps.tag.outputs.upstream == 'behind'
         run: |
-          git merge --no-edit "${ steps.tag.outputs.tag }"
-          echo "${ steps.tag.outputs.tag }" > pd/upstream-tag
+          git merge --no-edit "${{ steps.tag.outputs.tag }}"
+          echo "${{ steps.tag.outputs.tag }}" > pd/upstream-tag
       - name: Commit and push
         if: steps.tag.outputs.upstream == 'behind'
         run: |
           git add -A
           if git diff --cached --quiet; then
-            echo "already at ${ steps.tag.outputs.tag }"
+            echo "already at ${{ steps.tag.outputs.tag }}"
             exit 0
           fi
-          git commit -m "Sync from upstream release ${ steps.tag.outputs.tag }"
+          git commit -m "Sync from upstream release ${{ steps.tag.outputs.tag }}"
           git push origin "HEAD:main"
       # The merge was pushed with GITHUB_TOKEN, which does not trigger other
       # workflows, so code scanning runs here on the merged tree.
       - uses: github/codeql-action/init@v4
+        if: steps.tag.outputs.upstream == 'behind'
         with:
           language: javascript-typescript
           queries: security-and-quality
       - uses: github/codeql-action/analyze@v4
+        if: steps.tag.outputs.upstream == 'behind'
       - name: Hand the merged tree to the publish job
+        if: steps.tag.outputs.upstream == 'behind'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

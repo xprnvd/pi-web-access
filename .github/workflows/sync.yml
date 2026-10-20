@@ -1,0 +1,46 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    # Merge upstream's default branch into the fork, scan the result, and hand
+    # the publish job in ci.yml the merged tree.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Fetch upstream
+        run: |
+          git remote add upstream "https://github.com/nicobailon/pi-web-access.git"
+          # --no-tags keeps upstream's tag names out of the fork's tag
+          # namespace, so the fork's own release tags stay unambiguous.
+          git fetch --no-tags upstream "main:refs/remotes/upstream/main"
+      - name: Merge upstream
+        run: git merge --no-edit "refs/remotes/upstream/main"
+      - name: Push the merge
+        run: git push origin "HEAD:main"
+      # The merge was pushed with GITHUB_TOKEN, which does not trigger other
+      # workflows, so code scanning runs here on the merged tree.
+      - uses: github/codeql-action/init@v4
+        with:
+          language: javascript-typescript
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v4
+      - name: Hand the merged tree to the publish job
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
+            -f event_type=publish-extension

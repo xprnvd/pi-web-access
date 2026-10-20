@@ -30,7 +30,6 @@ jobs:
           package-manager-cache: false
       - run: npm ci --no-audit --no-fund
       - name: Check the tag matches the package version
-        working-directory: .
         run: |
           tag="${GITHUB_REF_NAME#v}"
           version="$(node -p "require('./package.json').version")"
@@ -40,7 +39,6 @@ jobs:
           fi
       - run: npm test
       - name: Set the published package identity
-        working-directory: .
         env:
           PD_SCOPE: ${{ vars.PD_SCOPE }}
         run: |
@@ -49,8 +47,7 @@ jobs:
           npm pkg set repository.type=git
           npm pkg set repository.url="git+https://github.com/xprnvd/pi-web-access.git"
           npm pkg delete repository.directory || true
-
       # Trusted publishing generates the provenance attestation on its own;
       # --provenance keeps it explicit, so a broken attestation fails the
       # publish instead of shipping a package without one.
-      - run: npm publish . --provenance --access public
+      - run: npm publish --provenance --access public

@@ -10,7 +10,6 @@ permissions:
   contents: read
 
 jobs:
-
   publish:
     # Publish to npm when a version tag is pushed, or when the sync workflow
     # dispatches this workflow after merging upstream.

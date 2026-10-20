@@ -24,16 +24,50 @@ jobs:
         run: |
           git config user.name "xprnvd"
           git config user.email "xprnvd@users.noreply.github.com"
-      - name: Fetch upstream
+      - name: Fetch the upstream releases
         run: |
           git remote add upstream "https://github.com/nicobailon/pi-web-access.git"
-          # --no-tags keeps upstream's tag names out of the fork's tag
-          # namespace, so the fork's own release tags stay unambiguous.
-          git fetch --no-tags upstream "main:refs/remotes/upstream/main"
-      - name: Merge upstream
-        run: git merge --no-edit "refs/remotes/upstream/main"
-      - name: Push the merge
-        run: git push origin "HEAD:main"
+          git fetch --tags upstream
+      - name: Find the latest upstream release
+        id: tag
+        run: |
+          tag="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+          if [ -z "$tag" ]; then
+            echo "no upstream release tag found" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          current=""
+          if [ -f pd/upstream-tag ]; then
+            current="$(cat pd/upstream-tag)"
+          fi
+          if [ "$tag" = "$current" ]; then
+            echo "upstream=up-to-date" >> "$GITHUB_OUTPUT"
+            echo "upstream release $tag is already in this repository" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "upstream=behind" >> "$GITHUB_OUTPUT"
+            echo "new upstream release: $tag (was $current)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      # The release tag, not upstream's branch. Upstream bumps the version in a
+      # release commit and then keeps committing, so the branch carries a
+      # released version number with unreleased work behind it. Publishing that
+      # would put a tarball on npm whose contents differ from upstream's own
+      # release of the same version number.
+      - name: Merge the upstream release
+        if: steps.tag.outputs.upstream == 'behind'
+        run: |
+          git merge --no-edit "${ steps.tag.outputs.tag }"
+          echo "${ steps.tag.outputs.tag }" > pd/upstream-tag
+      - name: Commit and push
+        if: steps.tag.outputs.upstream == 'behind'
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "already at ${ steps.tag.outputs.tag }"
+            exit 0
+          fi
+          git commit -m "Sync from upstream release ${ steps.tag.outputs.tag }"
+          git push origin "HEAD:main"
       # The merge was pushed with GITHUB_TOKEN, which does not trigger other
       # workflows, so code scanning runs here on the merged tree.
       - uses: github/codeql-action/init@v4

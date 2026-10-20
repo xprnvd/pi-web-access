@@ -43,7 +43,7 @@ jobs:
       - uses: github/codeql-action/analyze@v4
       - name: Hand the merged tree to the publish job
         env:
-          GH_TOKEN: ${{{{ github.token }}}}
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
             -f event_type=publish-extension
